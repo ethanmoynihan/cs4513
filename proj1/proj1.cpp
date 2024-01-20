@@ -117,6 +117,7 @@ std::vector<std::string> handle_dir(std::string name, std::string filepath, std:
     //add these before exploring the dir in main to handle indentation retVector.push_back(name +"/");
 
     //Check to see if it should keep being recursive
+    
     if(explore_depth < 1){
 
     }
