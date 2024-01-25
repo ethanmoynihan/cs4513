@@ -18,6 +18,7 @@ struct fileData {
     int fileSize;               //File size in 1-7 range
     int age;                    //File age in 1-7 range 
     int depth;                  //Multiply by depth for indentation
+    std::string extraInfo = "";
 };
 
 //time of running the file search for consistency 
@@ -47,7 +48,28 @@ fileData checkFileAttr(std::string file, int depth, bool age = false, bool extra
         }else {
             //regular file
             retData.fileType = 3;
-        }
+            if(extraInfo){
+                char buffer[100];
+                FILE *fp;
+                std::string cmnd = "file " + file;
+                fp = popen(cmnd.c_str(), "r");
+                while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+                    ;
+                }
+                std::string cmp = buffer;
+                size_t cmpPos = cmp.find(':');
+                if(cmpPos != std::string::npos){
+                    std::string output;
+                    for (char c : cmp.substr(cmpPos+1)) {
+                        if (c != '\n') {
+                            output += c;
+                        }
+                    }
+                    retData.extraInfo.append(output);
+                }
+                pclose(fp);
+            }
+            }
         //Check the fileSize for specific end var
         if( fileStat.st_size <100){
             retData.fileSize = 1;
@@ -64,7 +86,6 @@ fileData checkFileAttr(std::string file, int depth, bool age = false, bool extra
         }else if (fileStat.st_size >=10000000) {
             retData.fileSize = 7;
         }
-
         //handle diffence in age after
         // if age true use the last access time instead of last modified
         if(age){
@@ -134,8 +155,6 @@ fileData checkFileAttr(std::string file, int depth, bool age = false, bool extra
 
 std::string fileFormat(fileData information){
     //Handles file information and returns information string
-
-    
     std::string retString = "";
     size_t filePos = information.name.find_last_of('/');
     if(filePos != std::string::npos){
@@ -218,13 +237,102 @@ std::string fileFormat(fileData information){
             //if null unable to fid size (unlikely)
             break;
     }
+    
+    retString.append(information.extraInfo);
     return retString;
 };
 
-std::string fileFormatHTML(fileData information){
+std::string fileFormatHTML(fileData information, std::string num_indents = "    "){
     //add flags for handle 
     //todo implement
-    return information.name;
+    //might just 
+    std::string retString = "";
+    
+    switch (information.fileSize)
+    {
+        case 1:
+            retString.append("<p style=\"font-size:10px");
+            break;
+        case 2:
+            retString.append("<p style=\"font-size:15px");
+            break;
+        case 3:
+            retString.append("<p style=\"font-size:20px");
+            break;
+        case 4:
+            retString.append("<p style=\"font-size:25px");
+            break;
+        case 5:
+            retString.append("<p style=\"font-size:30px");
+            break;
+        case 6:
+            retString.append("<p style=\"font-size:35px");
+            break;
+        case 7:
+            retString.append("<p style=\"font-size:40px");
+            break;
+        
+        default:
+            retString.append("<p style=\"font-size:10px");
+            break;
+    }
+    if (information.fileSize <=7 && information.fileSize >=1){
+        retString.append(";white-space: pre;");
+    }
+
+    switch (information.age){
+
+        case 0:
+            retString.append("color:black\">");
+            break;
+        case 1:
+            retString.append("color:DimGray\">");
+            break;
+        case 2:
+            retString.append("color:Gray\">");
+            break;
+        case 3:
+            retString.append("color:DarkGray\">");
+            break;
+        case 4:
+            retString.append("color:Gray\">");
+            break;
+        case 5:
+            retString.append("color:LightGray\">");
+            break;
+        case 6:
+            retString.append("color:Gainsboro\">");
+            break;
+        
+        default:
+            //if null unable to fid size (unlikely)
+            retString.append(">");
+            break;
+    }
+    for(int i = 0; i<information.depth;i++){
+                    retString.append(num_indents);
+                }
+    retString.append(information.name);
+    switch (information.fileType){
+        case 0:
+            //directory
+            retString.append("/ ");
+            break;
+        case 1:
+            //symbolic link
+            retString.append("@ ");
+            break;
+        case 2:
+            //executable
+            retString.append("* ");
+            break;
+        default:
+            retString.append(" ");
+            break;
+    };  
+    retString.append("</p>");
+    
+    return retString;
 };
 
 int alphabetize(std::vector<fileData> *unsorted, fileData *fileToInsert){
@@ -276,7 +384,7 @@ std::vector<fileData> handle_dir(std::string name, int explore_depth, int curren
             std::string path = name;
             path.append("/");
             path.append(entry->d_name);
-            temp = checkFileAttr(path, current_depth, age);
+            temp = checkFileAttr(path, current_depth, age, fileType);
             //find place to insert entry or directory
             if(alphabetical){
                 place = alphabetize(&retVector, &temp);
@@ -330,8 +438,6 @@ int main(int argc, char* argv[]){
     time(&currentTime);
 
     for(int ind = 1; ind < argc; ind++){
-        //print arg for testing
-        std::cout << "Argument " << ind << ": " << argv[ind] << std::endl;
         std::string temp = argv[ind];
         
         //check to see if arg is a flag
@@ -377,7 +483,6 @@ int main(int argc, char* argv[]){
                             }
                             
                             //prints for testing
-                            std::cout << "Converted Integer: " << indents << std::endl;
                         } catch (const std::invalid_argument& e) {
                             std::cerr << "Conversion error: " << e.what() << std::endl;
                         } catch (const std::out_of_range& e) {
@@ -410,7 +515,7 @@ int main(int argc, char* argv[]){
                     break;
                 case 'h':
                     //generate output in HTML using font size and shading to represent file size and age
-
+                    html = true;
                     break;
                 case 's':
                     //sort alphabetical
@@ -420,6 +525,7 @@ int main(int argc, char* argv[]){
                     //Show file type 
                     fileType = true;
                     break;
+                
                 
             }
         }
@@ -447,7 +553,7 @@ int main(int argc, char* argv[]){
         for (int value : fileList) {
             std::string file  = argv[value];
             int place = 0;
-            temp = checkFileAttr(file, current_depth, age);
+            temp = checkFileAttr(file, current_depth, age, fileType);
             if(alphabetical){
                 place = alphabetize(&formated, &temp);
             }
@@ -472,10 +578,15 @@ int main(int argc, char* argv[]){
     }
 
     if(html){
+        std::cout << "<!DOCTYPE html>"<< std::endl;
+        std::cout << "<html> </body> " << std::endl;
         for(fileData entry : formated){
-            //TODO IMPLEMENT HTML
-
+            
+            std::string printString = fileFormatHTML(entry, num_indents);
+            std::cout << printString<< std::endl;
+             
         }
+        std::cout << "</body></html>" <<  std::endl;
     } else{   
         for(fileData entry : formated){
             std::string printString = "";
